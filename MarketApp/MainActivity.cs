@@ -4,15 +4,16 @@ using Android.Runtime;
 using Android.Widget;
 using AndroidX.AppCompat.App;
 using MarketApp.Adapters;
-using MarketApp.Services;
 using System.Text;
-using System.Xml;
+using MarketApp.Core.Services;
 
 namespace MarketApp
 {
     [Activity(Label = "@string/app_name", Theme = "@style/AppTheme", MainLauncher = true)]
     public class MainActivity : AppCompatActivity
     {
+        private readonly string _url = "http://partner.market.yandex.ru/pages/help/YML.xml";
+
         protected override async void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
@@ -21,9 +22,13 @@ namespace MarketApp
             SetContentView(Resource.Layout.activity_main);
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             var offersList = FindViewById<ListView>(Resource.Id.offerList);
-            var webService = new WebService();
-            var offers = await webService.GetOfferAsync();
-            
+
+            var webService = new WebService(_url);
+            var response = await webService.GetResponseResult(Encoding.GetEncoding("windows-1251"));
+
+            var parser = new XmlParserService();
+            var offers = parser.ParseDataToElements(response);
+
             var adapter = new OfferAdapter(offers);
             offersList.Adapter = adapter;
         }
