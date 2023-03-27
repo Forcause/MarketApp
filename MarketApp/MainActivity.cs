@@ -1,37 +1,52 @@
 ﻿using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Runtime;
 using Android.Widget;
-using AndroidX.AppCompat.App;
 using MarketApp.Adapters;
-using System.Text;
-using MarketApp.Core.Services;
+using MarketApp.Interfaces;
+using MarketApp.Model;
+using MarketApp.Services;
+using System.Collections.Generic;
+using System.Xml.Linq;
+using Newtonsoft.Json;
 
 namespace MarketApp
 {
     [Activity(Label = "@string/app_name", Theme = "@style/AppTheme", MainLauncher = true)]
-    public class MainActivity : AppCompatActivity
+    public class MainActivity : Activity
     {
-        private readonly string _url = "http://partner.market.yandex.ru/pages/help/YML.xml";
-
+        private IOfferSource _offerSource;
+        private IReadOnlyList<Offer> _offers;
+        private string _uri;
         protected override async void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
             Xamarin.Essentials.Platform.Init(this, savedInstanceState);
             // Set our view from the "main" layout resource
-            SetContentView(Resource.Layout.activity_main);
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            var offersList = FindViewById<ListView>(Resource.Id.offerList);
+            SetContentView(Resource.Layout.Main);
+            var mainView = FindViewById<ListView>(Resource.Id.MainView);
 
-            var webService = new WebService(_url);
-            var response = await webService.GetResponseResult(Encoding.GetEncoding("windows-1251"));
+            mainView.ItemClick += OnItemClicked;
 
-            var parser = new XmlParserService();
-            var offers = parser.ParseDataToElements(response);
+            var settings = Assets.Open("config.xml");
+            _uri = XDocument.Load(settings).Root.Value;
+            _offerSource = new YmlCatalogOfferSource(_uri);
+            _offers = await _offerSource.GetOffers();
+            var adapter = new OfferAdapter(_offers);
+            mainView.Adapter = adapter;
 
-            var adapter = new OfferAdapter(offers);
-            offersList.Adapter = adapter;
         }
+
+        private void OnItemClicked(object sender, AdapterView.ItemClickEventArgs e)
+        {
+            var intent = new Intent(this, typeof(OfferActivity));
+            var offerToSend = JsonConvert.SerializeObject(_offers[e.Position]);
+
+            intent.PutExtra("Offer", offerToSend);
+            StartActivity(intent);
+        }
+
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Android.Content.PM.Permission[] grantResults)
         {
             Xamarin.Essentials.Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
